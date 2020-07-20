@@ -1,0 +1,326 @@
+---
+title: "Exercise 3"
+author: "Mazzag Bálint"
+date: '2020 07 19 '
+output: github_document
+editor_options: 
+  chunk_output_type: inline
+---
+## Feladat leírása
+
+6 amerikai bank (JPMorgan Chase, Bank of America, Citigroup, Wells Fargo, Goldman Sachs, Morgan Stanley) close open high low ask és bid árfolyamait. 2003.12.10 és 2019.06.25 között. Az információk a Bloombergről lettek letöltve. Számodra elegendő lesz a close árakat használni ez elemzés során!
+
+ 
+A csatolt Excel adatok alapján a következő feladatokat végezd el:
+
+1) Statikus elemzés a): Vizsgáld meg (a teljes mintán) a korrelációs kapcsolatokat páronként. Interpretáld a kapott eredményeket valamilyen módon (ábra, táblázat ...).
+
+Korrelációs kapcsolatokat különböző eltolással is nézd meg (x(t) és y(t) között, x(t) és y(t-1), illetve x(t) és y(t+1)) között.
+
+2) Statikus elemzés b): Vizsgáld meg a válság előtt, a válság közben, és a válság után a korrelációs kapcsolatokat páronként.
+
+Interpretáld a kapott eredményeket valamilyen módon (ábra, táblázat ...).
+
+A 3 időszakra magadtól bontsd szét a teljes mintát, keress rá arra hogy szokták ezt szétválasztani.
+
+3) Dinamikus elemzés: Végezz el egy görgetett ablakos korrelációs elemzést két idősoron (JPMorgan Chase, Bank of America). Interpretáld a kapott eredményeket valamilyen módon (ábra, táblázat ...).
+
+A görgetett ablak mérete legyen 250 nap illetve 100 nap és 50 nap! Ha szükséges nézz utána hogy a görgetett ablak kifejezés (rolling window) milyen modellezési eljárást takar! Itt is azonos időpontok közötti és eltolásos korrelációt is vizsgálj.
+
+4) Pár mondatban foglald össze hogy az előző egyszerű elemzésnek milyen kapcsolata van az általad korábban feldolgozott 2 cikkel.
+
+5) Pár mondatban foglald össze hogy milyen egyéb elemzést lehetne még ezeken az adatokon elvégezni (amelyek ugyancsak kapcsolódnak ezekhez a cikkekhez).
+
+1-2 hasznos függvény:
+
++ https://www.quantstart.com/articles/Johansen-Test-for-Cointegrating-Time-Series-Analysis-in-R/
++ https://www.rdocumentation.org/packages/aTSA/versions/3.1.2/topics/coint.test
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "", warning = F, message = F, fig.align = "center", fig.height = 5, fig.width = 10, fig.path='plot/', tidy = T, cache.path="cache/")
+```
+
+```{r}
+library(tidyverse)
+library(urca)
+library(readxl)
+library(ggcorrplot)
+load("Script.RData") # datas from Bankdata.xlsx
+```
+
+```{r include=FALSE}
+theme_set(theme_light() + theme(
+  legend.title = element_blank(),
+  plot.title.position = "plot",
+  plot.tag.position = "topright",
+  plot.caption.position = "plot"
+))
+```
+
+```{r eval = F, include = F}
+# Chunk is only to save plots as PDF (to import to LateX)
+knitr::opts_chunk$set(dev = "pdf")
+theme_set(theme_light() + theme(
+  legend.title = element_blank(),
+  plot.title = element_blank(),
+  plot.subtitle = element_blank(),
+  plot.tag = element_blank(),
+  plot.caption = element_blank()
+))
+```
+
+```{r eval = knitr::is_html_output() == F, include = F}
+theme_set(ggdark::dark_theme_gray() + theme(
+  legend.title = element_blank(),
+  plot.title.position = "plot",
+  plot.tag.position = "topright"
+))
+```
+
+## Prices analysis
+
+```{r prices}
+correlation_xt_yt_price <- cor(bankdata_price[,-1])
+
+ggcorrplot(correlation_xt_yt_price, hc.order = TRUE, type = "lower", lab=TRUE,
+           outline.col = "white",
+           colors = c("red", "green", "blue")) + labs(title="Correlation of prices (static)",
+                                                      caption = "Calculations are all significant based on p = 5%",
+                                                      tag="Figure 1", x="Bank1" , y= "Bank2")
+```
+
+## Return analysis
+
+```{r returns}
+correlation_xt_yt_return <- cor(bankdata_return[,-1]) #Correlation matrix of returns
+bank_return_lagged <- cbind(tail(bankdata_return[,-1],-1), head(bankdata_return[,-1],-1))
+colnames(bank_return_lagged)[1:6] = paste(colnames(bank_return_lagged)[1:6], "t+1", sep="_")
+colnames(bank_return_lagged)[7:12] = paste(colnames(bank_return_lagged)[7:12], "t", sep="_")
+correlation_xt_yt_1_return <- cor(bank_return_lagged)
+#Correlation matrix of lagged returns in both directions: x(t) with y(t-1) and x(t) with y(t+1)
+correlation_xt_yt_1_return <- correlation_xt_yt_1_return[7:12,1:6]
+
+#Creating correlation matrices before the crisis
+bankdata_return_valsagelott <- bankdata_return[bankdata_return$Date<"2007-07-01",]
+
+correlation_xt_yt_return_valsagelott <- cor(bankdata_return_valsagelott[,-1]) #Correlation matrix of returns
+bank_return_lagged_valsagelott <- cbind(tail(bankdata_return_valsagelott[,-1],-1), head(bankdata_return_valsagelott[,-1],-1))
+colnames(bank_return_lagged_valsagelott)[1:6] = paste(colnames(bank_return_lagged_valsagelott)[1:6], "t+1", sep="_")
+colnames(bank_return_lagged_valsagelott)[7:12] = paste(colnames(bank_return_lagged_valsagelott)[7:12], "t", sep="_")
+correlation_xt_yt_1_return_valsagelott <- cor(bank_return_lagged_valsagelott)
+#Correlation matrix of lagged returns in both directions: x(t) with y(t-1) and x(t) with y(t+1)
+correlation_xt_yt_1_return_valsagelott <- correlation_xt_yt_1_return_valsagelott[7:12,1:6]
+
+#Creating correlation matrices during the crisis
+bankdata_return_valsagkozben <- bankdata_return["2007-07-01" < bankdata_return$Date & bankdata_return$Date < "2009-06-01",]
+
+correlation_xt_yt_return_valsagkozben <- cor(bankdata_return_valsagkozben[,-1]) #Correlation matrix of returns
+bank_return_lagged_valsagkozben <- cbind(tail(bankdata_return_valsagkozben[,-1],-1), head(bankdata_return_valsagkozben[,-1],-1))
+colnames(bank_return_lagged_valsagkozben)[1:6] = paste(colnames(bank_return_lagged_valsagkozben)[1:6], "t+1", sep="_")
+colnames(bank_return_lagged_valsagkozben)[7:12] = paste(colnames(bank_return_lagged_valsagkozben)[7:12], "t", sep="_")
+correlation_xt_yt_1_return_valsagkozben <- cor(bank_return_lagged_valsagkozben)
+#Correlation matrix of lagged returns in both directions: x(t) with y(t-1) and x(t) with y(t+1)
+correlation_xt_yt_1_return_valsagkozben <- correlation_xt_yt_1_return_valsagkozben[7:12,1:6]
+
+#Creating correlation matrices after the crisis
+bankdata_return_valsagutan <- bankdata_return[bankdata_return$Date>="2009-06-01",]
+
+correlation_xt_yt_return_valsagutan <- cor(bankdata_return_valsagutan[,-1]) #Correlation matrix of returns
+bank_return_lagged_valsagutan <- cbind(tail(bankdata_return_valsagutan[,-1],-1), head(bankdata_return_valsagutan[,-1],-1))
+colnames(bank_return_lagged_valsagutan)[1:6] = paste(colnames(bank_return_lagged_valsagutan)[1:6], "t+1", sep="_")
+colnames(bank_return_lagged_valsagutan)[7:12] = paste(colnames(bank_return_lagged_valsagutan)[7:12], "t", sep="_")
+correlation_xt_yt_1_return_valsagutan <- cor(bank_return_lagged_valsagutan)
+#Correlation matrix of lagged returns in both directions: x(t) with y(t-1) and x(t) with y(t+1)
+correlation_xt_yt_1_return_valsagutan <- correlation_xt_yt_1_return_valsagutan[7:12,1:6]
+
+```
+
+## Plotting all outputs
+
+## Plotting static returns
+
+```{r static, echo=FALSE}
+ggcorrplot(correlation_xt_yt_return, hc.order = TRUE, type = "lower", lab=TRUE,
+           outline.col = "white",
+           colors = c("grey", "green", "blue")) +
+  scale_fill_gradient2(breaks=c(0, 1), limit=c(0, 1), low = "green", 
+                       mid = "blue", high = "red", midpoint = 0.5)  + labs(title="Correlation of returns (static)",
+                                                                           caption = "Calculations are all significant based on p = 5%",
+                                                                           tag="Figure 2", x="Bank1" , y= "Bank2")
+
+ggcorrplot(correlation_xt_yt_return_valsagelott, hc.order = TRUE, type = "lower", lab=TRUE,
+           outline.col = "white",
+           colors = c("grey", "green", "blue")) +
+  scale_fill_gradient2(breaks=c(0, 1), limit=c(0, 1), low = "green", 
+                       mid = "blue", high = "red", midpoint = 0.5) + labs(title="Correlation of returns before the crisis (static)",
+                                                                          caption = "Calculations are all significant based on p = 5%",
+                                                                          tag="Figure 3", x="Bank1" , y= "Bank2")
+
+ggcorrplot(correlation_xt_yt_return_valsagkozben, hc.order = TRUE, type = "lower", lab=TRUE,
+           outline.col = "white",
+           colors = c("grey", "green", "blue")) +
+  scale_fill_gradient2(breaks=c(0, 1), limit=c(0, 1), low = "green", 
+                       mid = "blue", high = "red", midpoint = 0.5) + labs(title="Correlation of returns during the crisis (static)",
+                                                                          caption = "Calculations are all significant based on p = 5%",
+                                                                          tag="Figure 4", x="Bank1" , y= "Bank2")
+
+ggcorrplot(correlation_xt_yt_return_valsagutan, hc.order = TRUE, type = "lower", lab=TRUE,
+           outline.col = "white",
+           colors = c("grey", "green", "blue")) +
+  scale_fill_gradient2(breaks=c(0, 1), limit=c(0, 1), low = "green", 
+                       mid = "blue", high = "red", midpoint = 0.5)  + labs(title="Correlation of returns after the crisis (static)",
+                                                                           caption = "Calculations are all significant based on p = 5%",
+                                                                           tag="Figure 5", x="Bank1" , y= "Bank2")
+
+```
+
+
+## Plotting one lagged
+
+```{r one lagged}
+ggcorrplot(correlation_xt_yt_1_return, hc.order = TRUE, lab=TRUE,
+           outline.col = "white",
+           colors = c("grey", "green", "blue")) +
+  scale_fill_gradient2(breaks=c(-1, 1), limit=c(-1, 1), low = "green", 
+                       mid = "blue", high = "red", midpoint = 0)  + labs(title="Correlation of returns (dynamic)",
+                                                                         caption = "Calculations are all significant based on p = 5%",
+                                                                         tag="Figure 6", x="Bank x(t)" , y= "Bank y(t-1)")
+
+ggcorrplot(correlation_xt_yt_1_return_valsagelott, hc.order = TRUE, lab=TRUE,
+           outline.col = "white",
+           colors = c("grey", "green", "blue")) +
+  scale_fill_gradient2(breaks=c(-1, 1), limit=c(-1, 1), low = "green", 
+                       mid = "blue", high = "red", midpoint = 0) + labs(title="Correlation of returns before the crisis (dynamic)",
+                                                                        caption = "Calculations are all significant based on p = 5%",
+                                                                        tag="Figure 7", x="Bank x(t)" , y= "Bank y(t-1)")
+
+ggcorrplot(correlation_xt_yt_1_return_valsagkozben, hc.order = TRUE, lab=TRUE,
+           outline.col = "white",
+           colors = c("grey", "green", "blue")) +
+  scale_fill_gradient2(breaks=c(-1, 1), limit=c(-1, 1), low = "green", 
+                       mid = "blue", high = "red", midpoint = 0) + labs(title="Correlation of returns during the crisis (dynamic)",
+                                                                        caption = "Calculations are all significant based on p = 5%",
+                                                                        tag="Figure 8", x="Bank x(t)" , y= "Bank y(t-1)")
+
+ggcorrplot(correlation_xt_yt_1_return_valsagutan, hc.order = TRUE, lab=TRUE,
+           outline.col = "white",
+           colors = c("grey", "green", "blue")) +
+  scale_fill_gradient2(breaks=c(-1, 1), limit=c(-1, 1), low = "green", 
+                       mid = "blue", high = "red", midpoint = 0) + labs(title="Correlation of returns after the crisis (dynamic)",
+                                                                        caption = "Calculations are all significant based on p = 5%",
+                                                                        tag="Figure 9", x="Bank x(t)" , y= "Bank y(t-1)")
+
+```
+
+
+## Rolling window analysis for only two time series
+
+```{r rolling window, cache=TRUE, echo=FALSE}
+
+jpm_and_boa <- bankdata_return[,1:3]
+jpm_and_boa_all_lagged <- cbind(tail(jpm_and_boa[,-1],-1), head(jpm_and_boa[,-1],-1))
+colnames(jpm_and_boa_all_lagged) <- c("JPM+1", "BAC+1", "JPM", "BAC")
+
+
+
+for (i in 1:(nrow(jpm_and_boa) - 249)) {
+  if (i == 1) {
+    res <- cor.test(jpm_and_boa$JPM[i:(i+249)], jpm_and_boa$BAC[i:(i+249)], 
+                    method = "pearson")
+    correlation_list_250 <- cbind(jpm_and_boa[(249+i),1] ,res$estimate, NA, NA)
+    colnames(correlation_list_250) <- c("Date", "res$estimate", "res2$estimate", "res3$estimate")
+  } else {
+    res <- cor.test(jpm_and_boa$JPM[i:(i+249)], jpm_and_boa$BAC[i:(i+249)], 
+                    method = "pearson")
+    res2 <- cor.test(jpm_and_boa_all_lagged$`BAC+1`[i:(i+249)], jpm_and_boa_all_lagged$JPM[i:(i+249)], 
+                     method = "pearson")
+    res3 <- cor.test(jpm_and_boa_all_lagged$`JPM+1`[i:(i+249)], jpm_and_boa_all_lagged$BAC[i:(i+249)], 
+                     method = "pearson")
+    append <- cbind(jpm_and_boa[(249+i),1], res$estimate, res2$estimate, res3$estimate)
+    correlation_list_250 <- rbind(correlation_list_250, append)
+  }
+}
+
+correlation_list_250$Date <- as.Date(correlation_list_250$Date, "%m/%d/%y")
+
+ggplot() + 
+  geom_line(data = correlation_list_250, aes(x = Date, y = correlation_list_250$`res$estimate`, color = "green")) +
+  geom_line(data = correlation_list_250, aes(x = Date, y = correlation_list_250$`res2$estimate`, color = "red")) +
+  geom_line(data = correlation_list_250, aes(x = Date, y = correlation_list_250$`res3$estimate`, color = "blue")) +
+  scale_color_discrete(name = "Jelmagyarázat", labels = c("JPM(t) - BOA(t+1)", "JPM(t) - BOA(t-1)", "JPM(t) - BOA(t)")) +
+  geom_vline(xintercept=as.numeric(as.Date(c("2007-07-01"))), linetype="dashed", color="grey", size=1) +
+  geom_vline(xintercept=as.numeric(as.Date(c("2009-06-01"))), linetype="dashed", color="grey", size=1) +
+  ylim(-1,1) +
+  labs(title="Correlation of JPM and BOA",
+          caption = "Length of rolling window is 250 days",
+          tag="Figure 10", x="Time" , y= "Degree of correlation")
+
+#-------------------------------------------------------------
+for (i in 1:(nrow(jpm_and_boa) - 99)) {
+  if (i == 1) {
+    res <- cor.test(jpm_and_boa$JPM[i:(i+99)], jpm_and_boa$BAC[i:(i+99)], 
+                    method = "pearson")
+    correlation_list_100 <- cbind(jpm_and_boa[(99+i),1] ,res$estimate, NA, NA)
+    colnames(correlation_list_100) <- c("Date", "res$estimate", "res2$estimate", "res3$estimate")
+  } else {
+    res <- cor.test(jpm_and_boa$JPM[i:(i+99)], jpm_and_boa$BAC[i:(i+99)], 
+                    method = "pearson")
+    res2 <- cor.test(jpm_and_boa_all_lagged$`BAC+1`[i:(i+99)], jpm_and_boa_all_lagged$JPM[i:(i+99)], 
+                     method = "pearson")
+    res3 <- cor.test(jpm_and_boa_all_lagged$`JPM+1`[i:(i+99)], jpm_and_boa_all_lagged$BAC[i:(i+99)], 
+                     method = "pearson")
+    append <- cbind(jpm_and_boa[(99+i),1], res$estimate, res2$estimate, res3$estimate)
+    correlation_list_100 <- rbind(correlation_list_100, append)
+  }
+}
+
+correlation_list_100$Date <- as.Date(correlation_list_100$Date, "%m/%d/%y")
+
+ggplot() + 
+  geom_line(data = correlation_list_100, aes(x = Date, y = correlation_list_100$`res$estimate`, color = "green")) +
+  geom_line(data = correlation_list_100, aes(x = Date, y = correlation_list_100$`res2$estimate`, color = "red")) +
+  geom_line(data = correlation_list_100, aes(x = Date, y = correlation_list_100$`res3$estimate`, color = "blue")) +
+  scale_color_discrete(name = "Jelmagyarázat", labels = c("JPM(t) - BOA(t+1)", "JPM(t) - BOA(t-1)", "JPM(t) - BOA(t)")) +
+  geom_vline(xintercept=as.numeric(as.Date(c("2007-07-01"))), linetype="dashed", color="grey", size=1) +
+  geom_vline(xintercept=as.numeric(as.Date(c("2009-06-01"))), linetype="dashed", color="grey", size=1) +
+  ylim(-1,1) +
+  labs(title="Correlation of JPM and BOA",
+       caption = "Length of rolling window is 100 days",
+       tag="Figure 11", x="Time" , y= "Degree of correlation")
+#-------------------------------------------------------------
+for (i in 1:(nrow(jpm_and_boa) - 49)) {
+  if (i == 1) {
+    res <- cor.test(jpm_and_boa$JPM[i:(i+49)], jpm_and_boa$BAC[i:(i+49)], 
+                    method = "pearson")
+    correlation_list_50 <- cbind(jpm_and_boa[(49+i),1] ,res$estimate, NA, NA)
+    colnames(correlation_list_50) <- c("Date", "res$estimate", "res2$estimate", "res3$estimate")
+  } else {
+    res <- cor.test(jpm_and_boa$JPM[i:(i+49)], jpm_and_boa$BAC[i:(i+49)], 
+                    method = "pearson")
+    res2 <- cor.test(jpm_and_boa_all_lagged$`BAC+1`[i:(i+49)], jpm_and_boa_all_lagged$JPM[i:(i+49)], 
+                    method = "pearson")
+    res3 <- cor.test(jpm_and_boa_all_lagged$`JPM+1`[i:(i+49)], jpm_and_boa_all_lagged$BAC[i:(i+49)], 
+                     method = "pearson")
+    append <- cbind(jpm_and_boa[(49+i),1], res$estimate, res2$estimate, res3$estimate)
+    correlation_list_50 <- rbind(correlation_list_50, append)
+  }
+}
+
+correlation_list_50$Date <- as.Date(correlation_list_50$Date, "%m/%d/%y")
+
+ggplot() + 
+  geom_line(data = correlation_list_50, aes(x = Date, y = correlation_list_50$`res$estimate`, color = "green")) +
+  geom_line(data = correlation_list_50, aes(x = Date, y = correlation_list_50$`res2$estimate`, color = "red")) +
+  geom_line(data = correlation_list_50, aes(x = Date, y = correlation_list_50$`res3$estimate`, color = "blue")) +
+  scale_color_discrete(name = "Jelmagyarázat", labels = c("JPM(t) - BOA(t+1)", "JPM(t) - BOA(t-1)", "JPM(t) - BOA(t)")) +
+  geom_vline(xintercept=as.numeric(as.Date(c("2007-07-01"))), linetype="dashed", color="grey", size=1) +
+  geom_vline(xintercept=as.numeric(as.Date(c("2009-06-01"))), linetype="dashed", color="grey", size=1) +
+  ylim(-1,1) +
+  labs(title="Correlation of JPM and BOA",
+       caption = "Length of rolling window is 50 days",
+       tag="Figure 12", x="Time" , y= "Degree of correlation")
+
+
+```
